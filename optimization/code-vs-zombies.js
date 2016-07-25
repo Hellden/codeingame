@@ -1,17 +1,19 @@
-var DEBUG = true;
+'use strict';
+const DEBUG = true;
 //------------------------------------------------------------------------------
-var DECISIONS = ['NOT_MOVE', 'SURVIVE', 'PROTECT', 'KILL'];
+const DECISIONS = [ 'NOT_MOVE', 'SURVIVE', 'PROTECT', 'KILL' ];
 //------------------------------------------------------------------------------
-var AREA_WIDTH = 16 * 1000;
-var AREA_HEIGHT = 9 * 1000;
+const AREA_WIDTH = 16 * 1000;
+const AREA_HEIGHT = 9 * 1000;
 //------------------------------------------------------------------------------
-var ASH_MOVE = 1 * 1000;
-var ASH_FIRE_RANGE = 2 * 1000;
+const ASH_MOVE = 1 * 1000;
+const ASH_FIRE_RANGE = 2 * 1000;
 //------------------------------------------------------------------------------
-var ZOMBIE_MOVE = ZOMBIE_RANGE = 400;
+const ZOMBIE_MOVE = 400;
+const ZOMBIE_RANGE = ZOMBIE_MOVE;
 //------------------------------------------------------------------------------
-var toString = function () {
-  var args = Object.keys(arguments).map(i => arguments[i])
+const toString = function () {
+  const args = Object.keys(arguments).map(i => arguments[i])
     , nbArgs = args.length;
   for (var i = 0; i < nbArgs; i++) {
     if (typeof args[i] === 'object')
@@ -21,46 +23,49 @@ var toString = function () {
   }
   return args.join(' ');
 };
-//------------------------------------------------------------------------------
-var debugLog = function () {
-  if (DEBUG) printErr('debug: ' + toString.apply(null, arguments));
+const debugLog = function () {
+  if (!DEBUG) return;
+  printErr('debug: ' + toString.apply(null, arguments));
 };
 //------------------------------------------------------------------------------
-var fibonacci = function (max) {
-  var acc = arguments[1] || [];
-  var value = arguments[2] || 0;
-  if (acc.length === max) return acc;
-  var previousValue = acc.length ? acc[acc.length - 1] : 1;
+const fibonacci = function (max) {
+  const acc = arguments[1] || [];
+  const value = arguments[2] || 0;
+  if (acc.length === max)
+    return acc;
+  const previousValue = acc.length ? acc[acc.length - 1] : 1;
   acc.push(previousValue + value);
   return fibonacci(max, acc, previousValue);
 };
 //------------------------------------------------------------------------------
-var Position = function(x, y) { this.x = x; this.y =y; };
+const Position = function (x, y) { 
+  this.x = x;
+  this.y =y;
+};
 //------------------------------------------------------------------------------
 Position.prototype.distanceTo = function (position) {
-  var deltaX = Math.abs(position.x - this.x);
-  var deltaY = Math.abs(position.y - this.y);
+  const deltaX = Math.abs(position.x - this.x);
+  const deltaY = Math.abs(position.y - this.y);
   return Math.ceil(Math.sqrt(deltaX * deltaX + deltaY * deltaY));
 };
 //------------------------------------------------------------------------------
 Position.prototype.nbStepsTo = function (position, move) {
-  var distanceTo = this.distanceTo(position);
-  //TODO check that
+  const distanceTo = this.distanceTo(position);
   return Math.ceil(distanceTo / move);
 };
 //------------------------------------------------------------------------------
-var Humain = function (id, position) {
+const Humain = function (id, position) {
   this.id = id;
   this.position = position;
 };
 //------------------------------------------------------------------------------
-var Zombie = function (id, position, nextPosition) {
+const Zombie = function (id, position, nextPosition) {
   this.id = id;
   this.position = position;
   this.nextPosition = nextPosition;
 };
 // Frame------------------------------------------------------------------------
-var Frame = function(args) {
+const Frame = function(args) {
   this.parentIndex = args.parentIndex;
   this.ashPosition = args.ashPosition;
   this.humains = args.humains;
@@ -75,90 +80,93 @@ var Frame = function(args) {
 };
 Frame.prototype.takeDecision = function (save) {
   var decision = null; //TODO
-  if (save) this.decision = decision;
+  if (save)
+    this.decision = decision;
   return decision;
 };
 Frame.prototype.calculateNbHumainsDead = function () {
-  if (!initialFrame) return 0;
-  return initialFrame.nbHumainsLeft - this.nbHumainsLeft;
+  return !initialFrame ? 0 : initialFrame.nbHumainsLeft - this.nbHumainsLeft;
 };
 Frame.prototype.calculateNbZombiesDead = function () {
-  if (!initialFrame) return 0;
-  return initialFrame.nbZombiesLeft - this.nbZombiesLeft;
+  return !initialFrame ? 0 : initialFrame.nbZombiesLeft - this.nbZombiesLeft;
 };
 Frame.prototype.calculateRelativeScore = function () {
-  var score = 0;
-  var baseScore = Math.sqrt(this.nbHumainsLeft) * 10;
-  var fib = fibonacci(this.nbZombiesDead + 2);
-  for (var i = 1; i <= this.nbZombiesDead; i++) {
-    var zombieScore = baseScore * fib[i + 2];
+  const baseScore = Math.sqrt(this.nbHumainsLeft) * 10;
+  const fib = fibonacci(this.nbZombiesDead + 2);
+  let score = 0
+    , i = 1;
+  for (i; i <= this.nbZombiesDead; i++) {
+    const zombieScore = baseScore * fib[i + 2];
     score += zombieScore;
   }
   return score;
 };
 Frame.prototype.zombiesPositionsFrom = function (curPosition) {
-  var zombiesDistances = [];
-  for (var i = 0; i < this.nbZombiesLeft; i++) {
-    var zombieDistance = this.zombies[i].position.distanceTo(curPosition);
+  const zombiesDistances = [];
+  let i = 0;
+  for (i; i < this.nbZombiesLeft; i++) {
+    const zombieDistance = this.zombies[i].position.distanceTo(curPosition);
     zombiesDistances.push(zombieDistance);
   }
   return zombiesDistances;
 };
 Frame.prototype.distancesInRange = function (distances, range) {
-  var inRange = [], nbDistances = distances.length;
-  for (var i = 0; i < nbDistances; i++) {
-    if (distances[i] <= range)
-      inRange.push(distances[i]);
+  const inRange = []
+    , nbDistances = distances.length;
+  let i = 0;
+  for (i; i < nbDistances; i++) {
+    if (distances[i] > range) continue;
+    inRange.push(distances[i]);
   }
-  return distances;
+  return inRange;
 };
 Frame.prototype.ashInDanger = function (range) {
-  var zombiesDistances = this.zombiesPositionsFrom(this.ashPosition);
-  var dangerousZombies = this.distancesInRange(zombiesDistances, range);
-  //TODO could be improved
+  const zombiesDistances = this.zombiesPositionsFrom(this.ashPosition);
+  const dangerousZombies = this.distancesInRange(zombiesDistances, range);
+  debugLog('ashInDanger', dangerousZombies);
   return dangerousZombies.length > 0;
 };
 Frame.prototype.humainInDanger = function (humain, range) {
-  var zombiesDistances = this.zombiesPositionsFrom(humain.position);
-  var dangerousZombies = this.distancesInRange(zombiesDistances, range);
-  debugLog(zombiesDistances);
-  var nbZombies = dangerousZombies.length;
-  var humainSituation = {
+  const situation = {
     canBeSaved: true,
-    stepsBeforeDeath: 0
+    stepsBeforeDeath: -1
   };
-  for (var i = 0; i < nbZombies; i++) {
-    var zombie = dangerousZombies[i];
-    var zombieStepsToHumain = zombie.nbStepsTo(humain.position, ZOMBIE_MOVE);
-    var ashStepsToZombie = this.ashPosition.nbStepsTo(zombie, ASH_MOVE);
-    humainSituation.stepsBeforeDeath = zombieStepsToHumain - ashStepsToZombie;
-    if (humainSituation.stepsBeforeDeath <= 0) {
-      debugLog('humain', humain.id, 'can not be saved');
-      humainSituation.canBeSaved = false;
+  let i = 0;
+  for (i; i < this.nbZombiesLeft; i++) {
+    const zombie = this.zombies[i];
+    if (zombie.position.distanceTo(humain.position) > range) continue;
+    const zombieStepsToHumain = zombie.position.nbStepsTo(humain.position, ZOMBIE_MOVE);
+    const ashStepsToZombie = this.ashPosition.nbStepsTo(zombie, ASH_MOVE);
+    situation.stepsBeforeDeath = zombieStepsToHumain - ashStepsToZombie;
+    if (situation.stepsBeforeDeath <= 0) {
+      debugLog('humain', humain.id, 'can not be saved!');
+      situation.canBeSaved = false;
       break;
     }
   }
-  //TODO improve
-  return humainSituation;
+  debugLog('humainSituation', humain.id, situation);
+  return situation;
 };
 Frame.prototype.humainsInDanger = function (range) {
-  var humainsSituations = [];
-  for (var i = 0; i < this.nbHumainsLeft; i++) {
-    var humain = this.humains[i];
-    humainsSituations.push(this.humainInDanger(humain, range));
+  const situations = [];
+  let i = 0;
+  for (i; i < this.nbHumainsLeft; i++) {
+    const humain = this.humains[i];
+    situations.push(this.humainInDanger(humain, range));
   }
-  //TODO
-  return {};
+  const inDanger = situations.filter(situation => situation.canBeSaved);
+  return inDanger;
 };
 Frame.prototype.analyze = function () {
-  var situation = {};
+  const situation = {};
   situation.ashInDanger = this.ashInDanger(ZOMBIE_RANGE);
   situation.humainsVsZombies = this.humainsInDanger(ZOMBIE_RANGE * 5);
+  debugLog('situation', situation);
   return situation;
 };
 Frame.prototype.compute = function () {
-  var frames = [this];
-  var situation = this.analyze();
+  const frames = [ this ];
+  const situation = this.analyze();
   //var childFrames = childFrame.compute();
   //frames = frames.concat(childFrames);
   return frames;
@@ -175,41 +183,43 @@ var InputArgs = function () {
   this.getZombies();
 };
 InputArgs.prototype.getAshPosition = function () {
-  var inputs = readline().split(' ');
-  var ashX = Number(inputs[0]);
-  var ashY = Number(inputs[1]);
+  const inputs = readline().split(' ');
+  const ashX = Number(inputs[0]);
+  const ashY = Number(inputs[1]);
   this.ashPosition = new Position(ashX, ashY);
 };
 InputArgs.prototype.getHumains = function () {
   this.nbHumains = Number(readline());
-  for (var i = 0; i < this.nbHumains; i++) {
-    var inputs = readline().split(' ');
-    var id = Number(inputs[0]);
-    var x = Number(inputs[1]);
-    var y = Number(inputs[2]);
-    var humainPosition = new Position(x, y);
-    var humain = new Humain(id, humainPosition);
+  let i = 0;
+  for (i; i < this.nbHumains; i++) {
+    const inputs = readline().split(' ');
+    const id = Number(inputs[0]);
+    const x = Number(inputs[1]);
+    const y = Number(inputs[2]);
+    const humainPosition = new Position(x, y);
+    const humain = new Humain(id, humainPosition);
     this.humains.push(humain);
   }
 };
 InputArgs.prototype.getZombies = function () {
   this.nbZombies = Number(readline());
-  for (var i = 0; i < this.nbZombies; i++) {
-    var inputs = readline().split(' ');
-    var id = Number(inputs[0]);
-    var x = Number(inputs[1]);
-    var y = Number(inputs[2]);
-    var nextX = Number(inputs[3]);
-    var nextY = Number(inputs[4]);
-    var position = new Position(x, y);
-    var nextPosition = new Position(nextX, nextY);
-    var zombie = new Zombie(id, position, nextPosition);
+  let i = 0;
+  for (i; i < this.nbZombies; i++) {
+    const inputs = readline().split(' ');
+    const id = Number(inputs[0]);
+    const x = Number(inputs[1]);
+    const y = Number(inputs[2]);
+    const nextX = Number(inputs[3]);
+    const nextY = Number(inputs[4]);
+    const position = new Position(x, y);
+    const nextPosition = new Position(nextX, nextY);
+    const zombie = new Zombie(id, position, nextPosition);
     this.zombies.push(zombie);
   }
 };
 //------------------------------------------------------------------------------
-var createInitialFrame = function (args) {
-  var frameArgs = {};
+const createInitialFrame = function (args) {
+  const frameArgs = {};
   frameArgs.parentIndex = -1;
   frameArgs.ashPosition = args.ashPosition;
   frameArgs.humains = args.humains;
@@ -217,20 +227,20 @@ var createInitialFrame = function (args) {
   return new Frame(frameArgs);
 };
 //------------------------------------------------------------------------------
-var extractBestPositionsPath = function (frames) {
-  var positions = [];
+const extractBestPositionsPath = function (frames) {
+  const positions = [];
   return positions;
 };
 //------------------------------------------------------------------------------
-var firstIteration = true;
-var initialFrame = null;
-var ashPositions = null;
+let firstIteration = true
+  , initialFrame = null
+  , ashPositions = null;
 while (true) {
 
   if (firstIteration) {
     firstIteration = false;
-    initialFrame = createInitialFrame(new InputArgs());
-    var frames = initialFrame.compute();
+    initialFrame = createInitialFrame(new InputArgs);
+    const frames = initialFrame.compute();
     ashPositions = extractBestPositionsPath(frames);
   }
 
